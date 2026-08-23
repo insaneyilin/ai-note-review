@@ -40,7 +40,7 @@ type: ai-note-protocol
 status: active
 ```
 
-The protocol can live anywhere in the Vault. The Skill finds it through indexed metadata rather than a hard-coded path.
+The protocol can live anywhere in the Vault. The Skill finds it through an indexed Dataview metadata query rather than a hard-coded path. If Dataview is unavailable, the MCP server must provide an equivalent indexed metadata query.
 
 The Chinese example in `examples/AI_NOTE_PROTOCOL.zh-CN.example.md` demonstrates a different folder layout and a shorter localized policy.
 

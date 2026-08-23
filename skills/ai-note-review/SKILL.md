@@ -9,7 +9,7 @@ Review one incoming Obsidian note through an available Obsidian MCP server. Trea
 
 ## Load the vault protocol
 
-1. Find notes whose frontmatter has `type: ai-note-protocol` and `status: active` using metadata or indexed search. Do not scan every note body.
+1. Find notes whose frontmatter has `type: ai-note-protocol` and `status: active` using an indexed Dataview query such as `LIST FROM "" WHERE type = "ai-note-protocol" AND status = "active"`. If Dataview is unavailable, use another metadata-index query and verify both properties on every result. Do not scan every note body.
 2. Require exactly one active protocol. If none exists, tell the user to install and configure `templates/AI_NOTE_PROTOCOL.md`. If several exist, stop and list them for the user to resolve.
 3. Read the protocol in full before reading or analyzing the target.
 4. Treat the protocol as read-only unless the user explicitly asks to edit it.
