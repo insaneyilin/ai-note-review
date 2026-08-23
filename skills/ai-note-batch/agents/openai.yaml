@@ -1,0 +1,11 @@
+interface:
+  display_name: "AI Note Batch"
+  short_description: "Batch-review Slax bookmarks for Obsidian"
+  default_prompt: "Use $ai-note-batch to stage and review the next bounded set of Slax Reader bookmarks."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "obsidian"
+      description: "Obsidian indexed search, semantic search, metadata, link resolution, and path-specific file tools"
+policy:
+  allow_implicit_invocation: true

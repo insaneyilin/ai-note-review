@@ -2,14 +2,16 @@
 
 A reusable Codex Skill for reviewing one incoming Obsidian note before it enters a long-lived knowledge base.
 
+It also includes `$ai-note-batch`, a Slax Reader → Obsidian batch workflow. The older `slax-reader-export` remains an independent backup tool and is not required.
+
 It compares the note with a small set of indexed candidates, judges genuine knowledge gain, and recommends whether to discard, merge, retain as a Literature Note, or extract a Permanent Note. Reviews are read-only until the user explicitly approves changes.
 
 ## Requirements
 
 - Codex with personal Skills support.
-- An Obsidian MCP server available to Codex.
-- MCP capabilities for path-specific reads, indexed text search, semantic search, metadata lookup, and outgoing-link resolution.
-- Path-specific write, move, and delete capabilities if approved changes should be executed.
+- An Obsidian MCP server for indexed/semantic retrieval and relevant candidate passages.
+- Obsidian 1.12.7+ installer with **Settings → General → Command line interface** enabled; Obsidian must be running for apply.
+- Node.js 20+ and `reader-cli` 0.2.0 for the batch workflow.
 
 The repository contains no Vault data, credentials, fixed local endpoint, or personal directory layout.
 
@@ -27,7 +29,7 @@ During development, install it as a symbolic link:
 ./scripts/install.sh --link
 ```
 
-The installer refuses to replace an existing installation. Remove or rename an older copy deliberately before installing this one.
+The installer installs the `ai-note-batch` executable with npm and refuses to replace an existing Skill installation. Remove or rename an older Skill copy deliberately before installing this one.
 
 ## Configure a Vault
 
@@ -54,6 +56,33 @@ $ai-note-review note-name.md
 
 The first response is an audit only. To apply a recommendation, explicitly confirm the desired edit, move, merge, or deletion in a follow-up message.
 
+### One-time Slax migration
+
+```text
+$ai-note-batch migrate-index /absolute/path/to/20260804_index.md
+```
+
+Checked legacy rows become `ignored`; unchecked or malformed rows become ordered `pending` backlog entries. Migration writes only `.ai-note-review/state.json` in the selected Vault and is idempotent. It never modifies or copies the old index/exports.
+
+### Daily batches
+
+```text
+$ai-note-batch slax --limit 15
+$ai-note-batch review <batch-id>
+$ai-note-batch apply <batch-id>
+```
+
+Backlog is consumed first, followed by the paginated Slax inbox newest-first. The pinned local Defuddle fallback is used when Slax content fails the quality gate. Batch notes and `_review.md` live under the protocol's `batch_folder`. V2 review caps source excerpts near 6,000 characters, performs exact duplicate checks before one semantic retrieval, and keeps at most three related notes. On the board, checked means approved, unchecked means waiting, and non-empty human instructions override the AI suggestion.
+
+Apply uses the official Obsidian CLI. It first prints an exact dry-run and refuses all writes if Obsidian is not running, the Vault differs, a target conflicts, or a link is unresolved. New notes are minimal source cards; merge only appends a source reference; Permanent candidates remain human tasks. Hidden Slax markers make retries idempotent.
+
+The executable core can also be run directly after `npm install`:
+
+```sh
+node bin/ai-note-batch.js migrate-index /path/to/index.md --vault /path/to/vault
+node bin/ai-note-batch.js slax --limit 15 --vault /path/to/vault
+```
+
 ## Safety model
 
 - One note per review.
@@ -75,4 +104,4 @@ The Skill also follows Codex's standard Skill structure and can be checked with 
 
 ## Versioning
 
-Git tags freeze released behavior. `v1.0.0` is the first stable single-note workflow. The protocol's `version` field describes its configuration schema and is versioned independently from repository releases.
+Git tags freeze released behavior. `v1.0.0` is the first stable single-note workflow; `v1.1.0` adds Slax batch review; `v1.2.0` adds connection-first review and minimal, idempotent Obsidian CLI apply. Protocol version 2 adds `batch_folder` and `state_folder`; it is unchanged in v1.2.0.

@@ -1,8 +1,10 @@
 ---
 type: ai-note-protocol
-version: 1
+version: 2
 status: active
 inbox_folder: 0-AI-Inbox
+batch_folder: 0-AI-Inbox/_batches
+state_folder: .ai-note-review
 fleeting_folder: 001-Fleeting_Notes
 literature_folder: 002-Literature_Notes
 permanent_folder: 003-Permanent_Notes
