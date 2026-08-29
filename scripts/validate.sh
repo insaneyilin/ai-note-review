@@ -12,6 +12,7 @@ test -f "$batch_skill_dir/SKILL.md"
 test -f "$batch_skill_dir/agents/openai.yaml"
 test -f "$batch_skill_dir/references/daily.md"
 test -f "$repo_dir/templates/AI_NOTE_PROTOCOL.md"
+test -f "$repo_dir/docs/AI_NOTE_BATCH_V3.zh-CN.md"
 
 grep -q '^name: ai-note-review$' "$skill_dir/SKILL.md"
 grep -q '^description:' "$skill_dir/SKILL.md"
@@ -20,6 +21,7 @@ grep -q '^# Daily Slax Inbox$' "$batch_skill_dir/references/daily.md"
 grep -q '^type: ai-note-protocol$' "$repo_dir/templates/AI_NOTE_PROTOCOL.md"
 grep -q '^status: active$' "$repo_dir/templates/AI_NOTE_PROTOCOL.md"
 grep -q '^# AI Note Protocol$' "$repo_dir/templates/AI_NOTE_PROTOCOL.md"
+grep -q '^# AI Note Batch V3 中文使用指南$' "$repo_dir/docs/AI_NOTE_BATCH_V3.zh-CN.md"
 
 if grep -R -E '/Users/|127\.0\.0\.1|bearer|token' "$repo_dir/skills" "$repo_dir/templates" "$repo_dir/examples" >/dev/null 2>&1; then
   echo "Validation failed: personal paths, local endpoints, or secrets vocabulary found in reusable files" >&2

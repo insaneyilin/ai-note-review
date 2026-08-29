@@ -78,6 +78,8 @@ Apply uses the official Obsidian CLI. It first prints an exact dry-run and refus
 
 ### Incremental daily Inbox
 
+中文使用说明：[AI Note Batch V3 中文使用指南](docs/AI_NOTE_BATCH_V3.zh-CN.md)
+
 V3 keeps a single active approval board at `0-AI-Inbox/今日待整理.md`. Every unseen Slax Inbox link appears there, while Codex adds a compact recommendation, target, content hints, and up to three meaningful connections. Full article text remains only in Slax.
 
 Run a one-shot sync or apply the checked items:
