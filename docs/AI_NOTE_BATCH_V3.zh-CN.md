@@ -47,6 +47,31 @@ daily_history_folder: 0-AI-Inbox/_daily
 literature_folder: 002-Literature_Notes
 ```
 
+## 新会话与 Vault 定位
+
+日常整理不依赖之前的聊天记录，也不要求从 Vault 或某个固定项目目录启动 Codex。新开会话后，可以直接运行：
+
+```text
+$ai-note-batch sync
+```
+
+审批今日看板后，再运行：
+
+```text
+$ai-note-batch apply today
+```
+
+Skill 不会根据当前工作目录猜测 Vault，也不要求你每次输入 Vault 的绝对路径。它通过以下方式定位配置：
+
+1. 使用已配置的 Obsidian MCP 连接当前 Vault。
+2. 在该 Vault 中查找唯一一份同时包含 `type: ai-note-protocol` 和 `status: active` 的协议。
+3. 从协议读取 Inbox、每日看板、历史归档、状态账本和 Literature Notes 等 Vault 相对路径。
+4. 执行 apply 前，由 Obsidian 官方 CLI 核验当前打开的 Vault 与准备写入的 Vault 完全一致。
+
+Vault 的绝对路径只在本机执行和安全校验中使用，不需要写进日常命令。如果 MCP 连接了错误的 Vault、找不到唯一启用的协议，或者 Obsidian CLI 检测到 Vault 不匹配，流程必须停止，不能自行猜测或写入。
+
+因此，可以在任意目录启动 Codex。为了区分用途，可把普通工作目录作为日常整理入口，把本仓库目录仅用于开发和维护 Skill；这只是使用习惯，不是 Vault 定位机制。
+
 ## 第一次端到端验证
 
 先不要安装后台任务。向 Slax Reader 保存一篇你确实想留下的文章，然后在 Codex 中运行：
@@ -219,4 +244,3 @@ $ai-note-batch apply <batch-id>
 ```
 
 日常新增材料优先使用 `sync` 和 `apply today`；旧批次模式只用于有意处理一组历史材料。
-
