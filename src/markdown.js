@@ -29,8 +29,8 @@ export function boardEntry(entry) {
   return `- [ ] \`slax:${entry.id}\` [[${path.basename(entry.file, '.md')}]]\n  - 内容质量：${entry.quality || 'ok'}\n  - AI 建议：${entry.decision || '暂时无法判断'}\n  - 建议目标：${target}\n  - 内容线索：${hint}\n  - 关联：${links}\n  - 理由：${entry.reason || (entry.quality === 'needs_manual' ? '正文需要人工补充并重新审核' : '等待 AI 审核')}\n  - 人工修改意见：\n`;
 }
 
-function boardTarget(block) { const raw=block.match(/建议目标：\s*(.*)/)?.[1]?.trim()||''; const linked=raw.match(/^\[\[([^\]]+)\]\]$/)?.[1]; const value=linked||raw; return value && !/\.md$/i.test(value) ? `${value}.md` : value; }
-export function boardItems(markdown) { return [...markdown.matchAll(/^- \[([ xX])\] `slax:([^`]+)` \[\[([^\]]+)\]\][\s\S]*?(?=^- \[[ xX]\] `slax:|^## |$(?![\s\S]))/gmi)].map(match => ({ checked: match[1].toLowerCase() === 'x', id: match[2], note: match[3], block: match[0], quality: match[0].match(/内容质量：\s*(.*)/)?.[1]?.trim() || '', decision: match[0].match(/AI 建议：\s*(.*)/)?.[1]?.trim() || '', target_path: boardTarget(match[0]), human: match[0].match(/人工修改意见：\s*(.*)/)?.[1]?.trim() || '' })); }
+function boardTarget(block) { const raw=block.match(/建议目标：[ \t]*(.*)/)?.[1]?.trim()||''; const linked=raw.match(/^\[\[([^\]]+)\]\]$/)?.[1]; const value=linked||raw; return value && !/\.md$/i.test(value) ? `${value}.md` : value; }
+export function boardItems(markdown) { return [...markdown.matchAll(/^- \[([ xX])\] `slax:([^`]+)` \[\[([^\]]+)\]\][\s\S]*?(?=^- \[[ xX]\] `slax:|^## |$(?![\s\S]))/gmi)].map(match => ({ checked: match[1].toLowerCase() === 'x', id: match[2], note: match[3], block: match[0], quality: match[0].match(/内容质量：[ \t]*(.*)/)?.[1]?.trim() || '', decision: match[0].match(/AI 建议：[ \t]*(.*)/)?.[1]?.trim() || '', target_path: boardTarget(match[0]), human: match[0].match(/人工修改意见：[ \t]*(.*)/)?.[1]?.trim() || '' })); }
 export function checkedItems(markdown) { return boardItems(markdown).filter(item => item.checked); }
 
 export function preserveBoardApprovals(rendered, previousItems) {
@@ -39,7 +39,7 @@ export function preserveBoardApprovals(rendered, previousItems) {
     const escaped=old.id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
     const pattern=new RegExp('^- \\[ \\] `slax:'+escaped+'` \\[\\[[^\\]]+\\]\\][\\s\\S]*?(?=^- \\[|^## |$(?![\\s\\S]))','mi');
     const match=result.match(pattern); if (!match) continue;
-    let block=match[0]; if (old.checked) block=block.replace(/^- \[ \]/,'- [x]'); if (old.human) block=block.replace(/人工修改意见：\s*.*$/m,`人工修改意见：${old.human}`); result=result.replace(pattern,block);
+    let block=match[0]; if (old.checked) block=block.replace(/^- \[ \]/,'- [x]'); if (old.human) block=block.replace(/人工修改意见：[ \t]*.*$/m,`人工修改意见：${old.human}`); result=result.replace(pattern,block);
   }
   return result;
 }

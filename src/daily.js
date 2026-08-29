@@ -24,10 +24,11 @@ export function dailyBoardItems(markdown) {
   const blocks = [...String(markdown).matchAll(/<!-- ai-note-daily:item:([^\s]+):start -->\n([\s\S]*?)<!-- ai-note-daily:item:\1:end -->/g)];
   return blocks.map(match => {
     const block = match[2];
+    const human=block.match(/^  - 人工修改意见：[ \t]*(.*)$/m)?.[1]?.trim() || '';
     return {
       id: match[1],
       checked: /^- \[([xX])\]/m.test(block),
-      human: block.match(/^  - 人工修改意见：\s*(.*)$/m)?.[1]?.trim() || '',
+      human: human === '- 结果：' ? '' : human,
       retry: /^  - \[[xX]\] 重试抓取/m.test(block),
       block: match[0]
     };

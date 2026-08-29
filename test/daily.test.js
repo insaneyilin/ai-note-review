@@ -25,6 +25,12 @@ test('daily pull shows every new source once without storing full source text',a
   const second=await pullDaily({...env,...dependencies,now}); assert.equal(second.added,0); assert.equal(dailyBoardItems(await fs.readFile(dailyPaths(env.vault,{}).activeAbsolute,'utf8')).length,1);
 });
 
+test('empty human opinion never consumes the following result field',()=>{
+  const markdown='<!-- ai-note-daily:item:a:start -->\n- [ ] `slax:a` [A](<https://x>)\n  - 人工修改意见：\n  - 结果：\n<!-- ai-note-daily:item:a:end -->\n';
+  assert.equal(dailyBoardItems(markdown)[0].human,'');
+  assert.equal(dailyBoardItems(markdown.replace('人工修改意见：','人工修改意见：- 结果：'))[0].human,'');
+});
+
 test('review commit preserves approval and produces apply-today operations',async()=>{
   const env=await fixture(); const now=new Date('2026-08-29T12:00:00+08:00'); await pullDaily({...env,...dependencies,now});
   const paths=dailyPaths(env.vault,{}); let board=await fs.readFile(paths.activeAbsolute,'utf8');
@@ -53,4 +59,3 @@ test('short content retries three times and normalized URL duplicates stay out o
   assert.equal(env.state.sources.slax.old.status,'needs_manual'); assert.equal(env.state.sources.slax.duplicate.status,'ignored');
   const board=await fs.readFile(dailyPaths(env.vault,{}).activeAbsolute,'utf8'); assert.equal(dailyBoardItems(board).length,1); assert.match(board,/连续三次/);
 });
-
