@@ -50,7 +50,7 @@ export async function runCodexReview(input, { codex = 'codex' } = {}) {
   try {
     await fs.writeFile(schemaPath,JSON.stringify(reviewSchema()));
     const instructions = `Use the installed $ai-note-batch skill in background daily-review mode. This is read-only analysis. For each review_input below: inspect only its bounded excerpt; search exact full Slax ID, normalized URL, and normalized title in the Obsidian MCP while excluding every Inbox/batch note; if no exact duplicate, perform exactly one semantic retrieval and read only relevant candidate passages; retain at most three useful existing notes. Choose one supported decision and return manifest v3 matching the supplied schema. Literature targets default under the supplied literature_folder. Keep content_hint to 1-3 short sentences and reason extremely short. Do not modify files, Slax, tags, archives, MOCs, or schedules.\n\n${JSON.stringify(input)}`;
-    await runProcess(codex,['exec','--ephemeral','--skip-git-repo-check','-s','read-only','-a','never','-C',repositoryRoot,'--output-schema',schemaPath,'-o',outputPath,'-'],instructions);
+    await runProcess(codex,['-a','never','exec','--ephemeral','--skip-git-repo-check','-s','read-only','-C',repositoryRoot,'--output-schema',schemaPath,'-o',outputPath,'-'],instructions);
     return JSON.parse(await fs.readFile(outputPath,'utf8'));
   } finally { await fs.rm(temporary,{recursive:true,force:true}); }
 }
