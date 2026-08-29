@@ -1,7 +1,7 @@
 interface:
   display_name: "AI Note Batch"
-  short_description: "Batch-review Slax bookmarks for Obsidian"
-  default_prompt: "Use $ai-note-batch to stage and review the next bounded set of Slax Reader bookmarks."
+  short_description: "Sync or batch-review Slax bookmarks for Obsidian"
+  default_prompt: "Use $ai-note-batch to sync new Slax Reader bookmarks into the daily Obsidian approval board."
 dependencies:
   tools:
     - type: "mcp"

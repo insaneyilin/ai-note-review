@@ -2,7 +2,7 @@
 
 A reusable Codex Skill for reviewing one incoming Obsidian note before it enters a long-lived knowledge base.
 
-It also includes `$ai-note-batch`, a Slax Reader → Obsidian batch workflow. The older `slax-reader-export` remains an independent backup tool and is not required.
+It also includes `$ai-note-batch`, a Slax Reader → Obsidian incremental Inbox and compatible batch workflow. The older `slax-reader-export` remains an independent backup tool and is not required.
 
 It compares the note with a small set of indexed candidates, judges genuine knowledge gain, and recommends whether to discard, merge, retain as a Literature Note, or extract a Permanent Note. Reviews are read-only until the user explicitly approves changes.
 
@@ -76,6 +76,30 @@ Backlog is consumed first, followed by the paginated Slax inbox newest-first. Th
 
 Apply uses the official Obsidian CLI. It first prints an exact dry-run and refuses all writes if Obsidian is not running, the Vault differs, a target conflicts, or a link is unresolved. New notes are minimal source cards; merge only appends a source reference; Permanent candidates remain human tasks. Hidden Slax markers make retries idempotent.
 
+### Incremental daily Inbox
+
+V3 keeps a single active approval board at `0-AI-Inbox/今日待整理.md`. Every unseen Slax Inbox link appears there, while Codex adds a compact recommendation, target, content hints, and up to three meaningful connections. Full article text remains only in Slax.
+
+Run a one-shot sync or apply the checked items:
+
+```text
+$ai-note-batch sync
+$ai-note-batch apply today
+```
+
+Completed results remain linked from the board. On the next local date the complete board is archived under `0-AI-Inbox/_daily`, while unresolved entries carry forward.
+
+Background sync is explicit and separate from Skill installation. The default is every 90 minutes; install, inspect, trigger, or remove it with:
+
+```text
+$ai-note-batch automation install
+$ai-note-batch automation status
+$ai-note-batch automation run
+$ai-note-batch automation uninstall
+```
+
+Installation first shows a dry-run and then installs a per-Vault macOS LaunchAgent. It never starts Obsidian, stores credentials, changes Slax state, or applies knowledge-note operations. If Obsidian/MCP is unavailable, capture placeholders remain on the board and analysis retries later.
+
 The executable core can also be run directly after `npm install`:
 
 ```sh
@@ -104,4 +128,4 @@ The Skill also follows Codex's standard Skill structure and can be checked with 
 
 ## Versioning
 
-Git tags freeze released behavior. `v1.0.0` is the first stable single-note workflow; `v1.1.0` adds Slax batch review; `v1.2.0` adds connection-first review and minimal, idempotent Obsidian CLI apply. Protocol version 2 adds `batch_folder` and `state_folder`; it is unchanged in v1.2.0.
+Git tags freeze released behavior. `v1.0.0` is the first stable single-note workflow; `v1.1.0` adds Slax batch review; `v1.2.0` adds connection-first review and minimal, idempotent Obsidian CLI apply; `v1.3.0` adds the incremental daily Inbox and opt-in background sync. Protocol version 2 remains compatible and gains optional daily path settings.

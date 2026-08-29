@@ -5,6 +5,8 @@ status: active
 inbox_folder: 0-AI-Inbox
 batch_folder: 0-AI-Inbox/_batches
 state_folder: .ai-note-review
+daily_inbox_path: 0-AI-Inbox/今日待整理.md
+daily_history_folder: 0-AI-Inbox/_daily
 fleeting_folder: 001-Fleeting_Notes
 literature_folder: 002-Literature_Notes
 permanent_folder: 003-Permanent_Notes

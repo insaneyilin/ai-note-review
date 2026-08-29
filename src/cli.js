@@ -1,7 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { readState, writeState } from './state.js';
 import { migrateIndex } from './index-migration.js';
 import { requireLogin, listAllInbox, getMarkdown } from './slax.js';
@@ -11,8 +9,10 @@ import { normalizeUrl, safeName, stagedNote, reviewBoard, boardItems, preserveBo
 import { validateReviewEntry, operationFor, applyHumanOverride } from './manifest.js';
 import { planApply, executeApply } from './apply.js';
 import { cliRunner, readNote, preflightObsidian } from './obsidian.js';
-
-const repositoryRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+import { dailyBoardDate, dailyBoardItems, dailyPaths, renderDailyBoard } from './daily.js';
+import { commitDailyReviews, dailyApplyInput, pullDaily } from './daily-workflow.js';
+import { defuddle } from './defuddle.js';
+import { manageAutomation, preflightAutomation, runDailyAutomation } from './automation.js';
 
 function options(argv) { const out = { _: [] }; for (let i=0;i<argv.length;i++) argv[i].startsWith('--') ? out[argv[i].slice(2)] = argv[i+1] && !argv[i+1].startsWith('--') ? argv[++i] : true : out._.push(argv[i]); return out; }
 function vaultOf(opts) { return path.resolve(String(opts.vault || process.env.AI_NOTE_VAULT || process.cwd())); }
@@ -26,10 +26,6 @@ export function nextBatchId(dateStamp, directoryNames, state) {
   const used=new Set([...directoryNames,...Object.values(state.sources.slax).map(item=>item.batch_id).filter(Boolean)]);
   let sequence=1; while (used.has(`slax-${dateStamp}-${String(sequence).padStart(3,'0')}`)) sequence++;
   return `slax-${dateStamp}-${String(sequence).padStart(3,'0')}`;
-}
-
-async function defuddle(url) {
-  return new Promise((resolve, reject) => { const child = spawn(path.join(repositoryRoot, 'node_modules/.bin/defuddle'), ['parse', url, '--markdown'], { stdio: ['ignore', 'pipe', 'pipe'] }); let out=''; let err=''; child.stdout.on('data', x=>out+=x); child.stderr.on('data', x=>err+=x); child.on('close', code=>code ? reject(new Error(err || `Defuddle exited ${code}`)) : resolve(out)); });
 }
 
 export async function main(argv) {
@@ -53,6 +49,32 @@ export async function main(argv) {
     for (const item of candidates) { let markdown=''; try { markdown=await getMarkdown(item.id,opts['reader-cli']); } catch {} const fetchedUrl=markdown.match(/^Origin:\s*(https?:\/\/\S+)/mi)?.[1]||markdown.match(/^origin:\s*(https?:\/\/\S+)/mi)?.[1]||''; if (!item.url) item.url=fetchedUrl; let fallback=''; if (assessContent(markdown).quality==='suspect' && item.url) try { fallback=await defuddle(item.url); } catch {} const selected=chooseContent(markdown,fallback); const filename=`${safeName(item.title)}_${item.id}.md`; await fs.writeFile(path.join(dir,filename),stagedNote(item,batchId,selected)); const record=state.sources.slax[item.id] ||= {}; Object.assign(record,{...item,status:selected.quality==='needs_manual'?'needs_manual':'staged',batch_id:batchId,updated_at:new Date().toISOString()}); entries.push({...item,file:filename,quality:selected.quality}); }
     await fs.writeFile(path.join(dir,'_review.md'),reviewBoard(batchId,entries)); await writeState(vault,state); console.log(JSON.stringify({batch_id:batchId,path:dir,items:entries.length},null,2)); return;
   }
+  if (command === 'daily-pull') {
+    const result = await pullDaily({ vault, opts, state, requireLogin, listAllInbox, getMarkdown, defuddle });
+    await writeState(vault, state);
+    console.log(JSON.stringify(result, null, 2)); return;
+  }
+  if (command === 'daily-review') {
+    if (!opts.manifest) throw new Error('usage: ai-note-batch daily-review --manifest review.json --vault <vault>');
+    const payload = JSON.parse(await fs.readFile(path.resolve(String(opts.manifest)), 'utf8'));
+    const result = await commitDailyReviews({ vault, opts, state, manifest: payload });
+    await writeState(vault, state);
+    console.log(JSON.stringify(result, null, 2)); return;
+  }
+  if (command === 'daily-apply-input') {
+    const result = await dailyApplyInput({ vault, opts, state, literatureFolder: String(opts['literature-folder'] || '002-Literature_Notes') });
+    console.log(JSON.stringify(result, null, 2)); return;
+  }
+  if (command === 'sync' || command === 'automation-run') {
+    const result=await runDailyAutomation({vault,opts,state,dependencies:{requireLogin,listAllInbox,getMarkdown,defuddle},codex:String(opts.codex||'codex')});
+    console.log(JSON.stringify(result,null,2)); return;
+  }
+  if (command === 'automation') {
+    if (!arg) throw new Error('usage: ai-note-batch automation <install|status|run|uninstall> --vault <vault> [--interval 5400] [--execute]');
+    if (arg==='install' && opts.execute) await preflightAutomation({vault,codex:String(opts.codex||'codex'),reader:String(opts['reader-cli']||'reader-cli')});
+    const result=await manageAutomation(arg,{vault,interval:Number(opts.interval||5400),dailyInboxPath:String(opts['daily-inbox-path']||'0-AI-Inbox/今日待整理.md'),dailyHistoryFolder:String(opts['daily-history-folder']||'0-AI-Inbox/_daily'),literatureFolder:String(opts['literature-folder']||'002-Literature_Notes'),codex:String(opts.codex||'codex'),reader:String(opts['reader-cli']||'reader-cli')},{dryRun:arg==='status'?false:!opts.execute});
+    console.log(JSON.stringify(result,null,2)); return;
+  }
   if (command === 'review') {
     if (!arg) throw new Error('usage: ai-note-batch review <batch-id> --vault <vault> [--manifest review.json]');
     const dir=batchDir(vault,opts,arg); const boardPath=path.join(dir,'_review.md'); const board=await fs.readFile(boardPath,'utf8'); const current=boardItems(board);
@@ -69,11 +91,43 @@ export async function main(argv) {
   }
   if (command === 'apply') {
     if (!arg || !opts.manifest) throw new Error('usage: ai-note-batch apply <batch-id> --manifest apply.json --vault <vault> [--execute]');
+    if (arg === 'today') {
+      const run=cliRunner(opts['obsidian-cli'] || 'obsidian');
+      await preflightObsidian(vault,run);
+      const paths=dailyPaths(vault,opts);
+      const board=await readNote(run,vault,paths.active);
+      const checked=new Map(dailyBoardItems(board).filter(x=>x.checked).map(x=>[x.id,x]));
+      const payload=JSON.parse(await fs.readFile(path.resolve(String(opts.manifest)),'utf8'));
+      if (payload.manifest_schema_version!==3 || payload.surface!=='daily') throw new Error('daily apply requires manifest v3');
+      payload.operations=payload.operations.map(item=>{
+        const approved=checked.get(item.source_id);
+        if (!approved) throw new Error(`${item.source_id}: unchecked or absent daily entry`);
+        const record=state.sources.slax[item.source_id];
+        if (!record || record.surface!=='daily') throw new Error(`${item.source_id}: missing daily state`);
+        if (record.status==='needs_manual' || record.daily?.analysis_status!=='ready') throw new Error(`${item.source_id}: daily entry is not ready`);
+        return applyHumanOverride({...item,board_path:paths.active},approved.human);
+      });
+      const activeDate=dailyBoardDate(board);
+      const context={vault,run,onSettled:async(item,status)=>{
+        const record=state.sources.slax[item.source_id];
+        record.status=status;
+        record.result_path=item.target_path||'';
+        record.updated_at=new Date().toISOString();
+        const latest=await readNote(run,vault,paths.active);
+        const rendered=renderDailyBoard(activeDate,Object.values(state.sources.slax),latest,{status:'正常'});
+        await run(vault,'create',[`path=${paths.active}`,`content=${rendered}`,'overwrite']);
+        await writeState(vault,state);
+      }};
+      const plan=await planApply(payload,context);
+      console.log(JSON.stringify({dry_run:!opts.execute,surface:'daily',active_date:activeDate,operations:plan},null,2));
+      if (opts.execute) console.log(JSON.stringify({results:await executeApply(payload,context)},null,2));
+      return;
+    }
     const run=cliRunner(opts['obsidian-cli'] || 'obsidian'); await preflightObsidian(vault,run); const boardRelative=path.relative(vault,path.join(batchDir(vault,opts,arg),'_review.md')).replaceAll(path.sep,'/'); const board=await readNote(run,vault,boardRelative); const checked=new Map(boardItems(board).filter(x=>x.checked).map(x=>[x.id,x]));
     const payload=JSON.parse(await fs.readFile(path.resolve(String(opts.manifest)),'utf8')); if (payload.batch_id!==arg) throw new Error('apply manifest batch mismatch');
     payload.operations=payload.operations.map(item=>{ const approved=checked.get(item.source_id); if (!approved) throw new Error(`${item.source_id}: unchecked or absent board entry`); if (state.sources.slax[item.source_id]?.status==='needs_manual') throw new Error(`${item.source_id}: needs_manual cannot be applied`); return applyHumanOverride(item,approved.human); });
     const context={vault,run,onSettled:async(item,status)=>{ const latest=settleBoardItem(await readNote(run,vault,boardRelative),item,status); await run(vault,'create',[`path=${boardRelative}`,`content=${latest}`,'overwrite']); const record=state.sources.slax[item.source_id]; record.status=status; record.result_path=item.target_path||''; record.updated_at=new Date().toISOString(); await writeState(vault,state); }};
     const plan=await planApply(payload,context); console.log(JSON.stringify({dry_run:!opts.execute,batch_id:arg,operations:plan},null,2)); if (opts.execute) console.log(JSON.stringify({results:await executeApply(payload,context)},null,2)); return;
   }
-  throw new Error('usage: ai-note-batch <migrate-index|slax|review|apply> ...');
+  throw new Error('usage: ai-note-batch <migrate-index|slax|sync|daily-pull|daily-review|daily-apply-input|review|apply|automation> ...');
 }

@@ -2,10 +2,11 @@ import { preflightObsidian, cliRunner, noteExists, readNote, slaxMarker, sourceC
 import { OPERATIONS } from './manifest.js';
 
 export function validateApplyManifest(manifest) {
-  if (manifest?.manifest_schema_version !== 2 || !manifest.batch_id || !Array.isArray(manifest.operations)) throw new Error('invalid apply manifest v2');
+  const daily = manifest?.manifest_schema_version === 3 && manifest.surface === 'daily';
+  if ((!daily && (manifest?.manifest_schema_version !== 2 || !manifest.batch_id)) || !Array.isArray(manifest?.operations)) throw new Error('invalid apply manifest');
   const ids = new Set();
   for (const item of manifest.operations) {
-    if (!OPERATIONS.has(item.operation) || !item.source_id || !item.staged_path) throw new Error('invalid apply operation');
+    if (!OPERATIONS.has(item.operation) || !item.source_id || (!daily && !item.staged_path) || (daily && !item.board_path)) throw new Error('invalid apply operation');
     if (ids.has(item.source_id)) throw new Error(`duplicate source operation: ${item.source_id}`); ids.add(item.source_id);
     if (!['discard', 'acknowledge_existing'].includes(item.operation) && !item.target_path) throw new Error(`${item.source_id}: target_path required`);
     if ((item.links || []).length > 3) throw new Error(`${item.source_id}: at most three links`);
@@ -15,6 +16,7 @@ export function validateApplyManifest(manifest) {
 
 export async function planApply(manifest, { vault, run = cliRunner(), processRunning } = {}) {
   validateApplyManifest(manifest);
+  const daily = manifest.manifest_schema_version === 3;
   await preflightObsidian(vault, run, processRunning);
   const plan = [];
   for (const item of manifest.operations) {
@@ -23,12 +25,12 @@ export async function planApply(manifest, { vault, run = cliRunner(), processRun
     let existing = '';
     if (item.target_path && await noteExists(run, vault, item.target_path)) existing = await readNote(run, vault, item.target_path);
     const marked = existing.includes(slaxMarker(item.source_id));
-    const stagedExists=await noteExists(run,vault,item.staged_path);
-    if (stagedExists) { const staged=await readNote(run,vault,item.staged_path); if (!staged.includes(`source_id: ${item.source_id}`)) throw new Error(`${item.source_id}: staged source mismatch`); }
-    else if (!marked && item.operation!=='discard') throw new Error(`${item.source_id}: staged source missing`);
+    const stagedExists=daily ? false : await noteExists(run,vault,item.staged_path);
+    if (!daily && stagedExists) { const staged=await readNote(run,vault,item.staged_path); if (!staged.includes(`source_id: ${item.source_id}`)) throw new Error(`${item.source_id}: staged source mismatch`); }
+    else if (!daily && !marked && item.operation!=='discard') throw new Error(`${item.source_id}: staged source missing`);
     if (item.operation.startsWith('create_') && existing && !marked) throw new Error(`${item.source_id}: target conflict at ${item.target_path}`);
     if (item.operation === 'append_source_reference' && !existing) throw new Error(`${item.source_id}: merge target missing at ${item.target_path}`);
-    plan.push({ source_id: item.source_id, operation: marked || (!stagedExists && item.operation==='discard') ? 'acknowledge_existing' : item.operation, original_operation:item.operation, staged_exists:stagedExists, source: item.staged_path, destination: item.target_path || null, recoverable: item.operation === 'discard' });
+    plan.push({ source_id: item.source_id, operation: marked || (!daily && !stagedExists && item.operation==='discard') ? 'acknowledge_existing' : item.operation, original_operation:item.operation, staged_exists:stagedExists, source: daily ? item.board_path : item.staged_path, destination: item.target_path || null, recoverable: !daily && item.operation === 'discard' });
   }
   return plan;
 }

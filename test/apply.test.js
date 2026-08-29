@@ -54,3 +54,10 @@ test('Obsidian logical errors fail even when its process exits zero',()=>{
   assert.throws(()=>requireCliSuccess('Error: File "missing.md" not found.\n'),/not found/);
   assert.equal(requireCliSuccess('note body\n'),'note body\n');
 });
+
+test('daily manifest creates a card without deleting the daily board',async()=>{
+  const daily={manifest_schema_version:3,surface:'daily',active_date:'2026-08-29',operations:[{...base.operations[0],staged_path:'',board_path:'0-AI-Inbox/今日待整理.md'}]};
+  const env=fake({'0-AI-Inbox/今日待整理.md':'daily board'}); const context={vault:'/vault',run:env.run,processRunning:async()=>true};
+  const plan=await planApply(daily,context); assert.equal(plan[0].source,'0-AI-Inbox/今日待整理.md'); assert.equal(plan[0].staged_exists,false);
+  await executeApply(daily,context); assert.equal(env.files.has('0-AI-Inbox/今日待整理.md'),true); assert.equal(env.files.has('lit/Source.md'),true); assert.equal(env.writes.includes('delete'),false);
+});
