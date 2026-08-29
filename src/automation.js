@@ -13,6 +13,10 @@ const repositoryRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url))
 
 export const DEFAULT_AUTOMATION_INTERVAL = 5400;
 
+export function publicPullSummary(pulled) {
+  const summary={...pulled,review_input_count:(pulled.review_inputs||[]).length}; delete summary.review_inputs; return summary;
+}
+
 function reviewSchema() {
   return {
     type: 'object', additionalProperties: false,
@@ -85,16 +89,17 @@ export async function runDailyAutomation({ vault, opts, state, dependencies, cod
     let pulled;
     try { pulled=await pullDaily({vault,opts,state,...dependencies}); await writeState(vault,state); }
     catch (error) { await markDailyReviewFailure({vault,opts,state,sourceIds:[],error}); await writeState(vault,state); throw error; }
-    if (!pulled.review_inputs.length) return { pulled, reviewed: 0 };
+    const publicPull=publicPullSummary(pulled);
+    if (!pulled.review_inputs.length) return { pulled:publicPull, reviewed: 0 };
     if (!(await obsidianRunning())) {
       const error=new Error('Obsidian/MCP 未运行；已收件，将在下次同步重试。');
       await markDailyReviewFailure({vault,opts,state,sourceIds:pulled.review_inputs.map(x=>x.source_id),error}); await writeState(vault,state);
-      return { pulled, reviewed: 0, deferred: true };
+      return { pulled:publicPull, reviewed: 0, deferred: true };
     }
     try {
       const manifest=await runCodexReview(pulled,{codex});
       const committed=await commitDailyReviews({vault,opts,state,manifest}); await writeState(vault,state);
-      return { pulled, reviewed: committed.reviewed.length };
+      return { pulled:publicPull, reviewed: committed.reviewed.length };
     } catch (error) {
       await markDailyReviewFailure({vault,opts,state,sourceIds:pulled.review_inputs.map(x=>x.source_id),error}); await writeState(vault,state); throw error;
     }

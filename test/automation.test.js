@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { automationSpec, manageAutomation, runCodexReview, withDailyLock } from '../src/automation.js';
+import { automationSpec, manageAutomation, publicPullSummary, runCodexReview, withDailyLock } from '../src/automation.js';
 
 test('automation defaults to 90 minutes and uses a login shell without embedding secrets',()=>{
   const spec=automationSpec({vault:'/tmp/example-vault',home:'/tmp/home',node:'/usr/bin/node',executable:'/opt/ai-note-batch.js'});
@@ -33,4 +33,8 @@ test('Codex review bridge does not propagate prompts from verbose stderr',async(
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'fake-codex-error-')); const codex=path.join(dir,'codex');
   await fs.writeFile(codex,`#!/bin/sh\nprintf '%s\\n' 'user SECRET_SOURCE_BODY' '{"message":"schema rejected"}' >&2\nexit 1\n`); await fs.chmod(codex,0o755);
   await assert.rejects(runCodexReview({review_inputs:[{excerpt:'SECRET_SOURCE_BODY'}]},{codex}),error=>error.message==='schema rejected' && !error.message.includes('SECRET_SOURCE_BODY'));
+});
+
+test('public sync result never includes review excerpts',()=>{
+  const result=publicPullSummary({added:1,review_inputs:[{excerpt:'SECRET_SOURCE_BODY'}]}); assert.equal(result.review_input_count,1); assert.equal('review_inputs' in result,false); assert.doesNotMatch(JSON.stringify(result),/SECRET_SOURCE_BODY/);
 });
