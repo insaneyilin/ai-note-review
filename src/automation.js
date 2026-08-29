@@ -18,7 +18,7 @@ function reviewSchema() {
     type: 'object', additionalProperties: false,
     required: ['manifest_schema_version', 'surface', 'active_date', 'reviews'],
     properties: {
-      manifest_schema_version: { const: 3 }, surface: { const: 'daily' }, active_date: { type: 'string' },
+      manifest_schema_version: { type: 'integer', const: 3 }, surface: { type: 'string', const: 'daily' }, active_date: { type: 'string' },
       reviews: { type: 'array', items: { type: 'object', additionalProperties: false,
         required: ['source_id','decision','target_path','content_hint','tags','links','reason'],
         properties: {
@@ -39,9 +39,18 @@ function runProcess(command, args, input = '') {
   return new Promise((resolve, reject) => {
     const child=spawn(command,args,{cwd:repositoryRoot,stdio:['pipe','pipe','pipe']}); let stdout=''; let stderr='';
     child.stdout.on('data',x=>stdout+=x); child.stderr.on('data',x=>stderr+=x);
-    child.on('error',reject); child.on('close',code=>code ? reject(new Error(stderr.trim() || `${command} exited ${code}`)) : resolve(stdout));
+    child.on('error',reject); child.on('close',code=>code ? reject(new Error(processErrorSummary(stderr,`${command} exited ${code}`))) : resolve(stdout));
     child.stdin.end(input);
   });
+}
+
+function processErrorSummary(stderr, fallback) {
+  const messages=[...String(stderr).matchAll(/"message"\s*:\s*"((?:\\.|[^"\\])*)"/g)];
+  if (messages.length) {
+    try { return JSON.parse(`"${messages.at(-1)[1]}"`).replace(/\s+/g,' ').slice(0,500); } catch {}
+  }
+  const last=String(stderr).split('\n').map(x=>x.trim()).filter(Boolean).at(-1);
+  return String(last || fallback).replace(/\s+/g,' ').slice(0,500);
 }
 
 export async function runCodexReview(input, { codex = 'codex' } = {}) {

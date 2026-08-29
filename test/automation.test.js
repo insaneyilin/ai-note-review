@@ -28,3 +28,9 @@ test('Codex review bridge reads a schema-constrained manifest from an ephemeral 
   await fs.writeFile(codex,`#!/bin/sh\nout=''\nwhile [ "$#" -gt 0 ]; do if [ "$1" = "-o" ]; then shift; out=$1; fi; shift; done\nprintf '%s' '{"manifest_schema_version":3,"surface":"daily","active_date":"2026-08-29","reviews":[]}' > "$out"\n`); await fs.chmod(codex,0o755);
   const result=await runCodexReview({active_date:'2026-08-29',review_inputs:[]},{codex}); assert.equal(result.manifest_schema_version,3); assert.deepEqual(result.reviews,[]);
 });
+
+test('Codex review bridge does not propagate prompts from verbose stderr',async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'fake-codex-error-')); const codex=path.join(dir,'codex');
+  await fs.writeFile(codex,`#!/bin/sh\nprintf '%s\\n' 'user SECRET_SOURCE_BODY' '{"message":"schema rejected"}' >&2\nexit 1\n`); await fs.chmod(codex,0o755);
+  await assert.rejects(runCodexReview({review_inputs:[{excerpt:'SECRET_SOURCE_BODY'}]},{codex}),error=>error.message==='schema rejected' && !error.message.includes('SECRET_SOURCE_BODY'));
+});

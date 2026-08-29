@@ -4,6 +4,7 @@ import { validateReviewEntry, operationFor } from './manifest.js';
 import { atomicWrite, dailyBoardDate, dailyBoardItems, dailyPaths, isoDate, readIfExists, renderDailyBoard, rolloverDailyBoard } from './daily.js';
 
 function sourceRecords(state) { return Object.values(state.sources.slax); }
+function conciseError(value) { return String(value?.message || value || 'unknown error').replace(/\s+/g, ' ').slice(0, 500); }
 
 function fetchedOrigin(markdown) {
   return String(markdown).match(/^Origin:\s*(https?:\/\/\S+)/mi)?.[1] || String(markdown).match(/^origin:\s*(https?:\/\/\S+)/mi)?.[1] || '';
@@ -62,7 +63,7 @@ export async function pullDaily({ vault, opts, state, requireLogin, listAllInbox
     try { markdown = await getMarkdown(record.source_id, opts['reader-cli']); }
     catch (error) {
       record.daily.analysis_status = 'error';
-      record.daily.last_error = `Slax 抓取失败：${error.message}`;
+      record.daily.last_error = `Slax 抓取失败：${conciseError(error)}`;
       record.updated_at = now.toISOString();
       continue;
     }
@@ -145,14 +146,15 @@ export async function markDailyReviewFailure({ vault, opts, state, sourceIds, er
   const existingDate = dailyBoardDate(board);
   if (board && !existingDate) throw new Error(`daily inbox conflict at ${paths.active}`);
   if (existingDate && existingDate !== date) return { deferred: true, reason: 'daily rollover has not completed' };
+  const message=conciseError(error);
   for (const id of sourceIds) {
     const record = state.sources.slax[id];
     if (!record || record.status !== 'staged') continue;
     record.daily.analysis_status = 'error';
-    record.daily.last_error = `AI 审核失败：${String(error.message || error)}`;
+    record.daily.last_error = `AI 审核失败：${message}`;
     record.updated_at = new Date().toISOString();
   }
-  await atomicWrite(paths.activeAbsolute, renderDailyBoard(date, sourceRecords(state), board, { status: '部分失败，等待重试', error: String(error.message || error) }));
+  await atomicWrite(paths.activeAbsolute, renderDailyBoard(date, sourceRecords(state), board, { status: '部分失败，等待重试', error: message }));
 }
 
 export async function dailyApplyInput({ vault, opts, state, literatureFolder = '002-Literature_Notes' }) {
